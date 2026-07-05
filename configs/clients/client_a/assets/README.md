@@ -1,0 +1,1 @@
+Placeholder — see [`configs/clients/default/assets/README.md`](../../default/assets/README.md). Real client_a branding assets are supplied by the client and added when it is actually built (Phase 5 white-label proof).

@@ -1,0 +1,8 @@
+{
+  "featureFlags": {
+    "dynamicFormsDebugPanel": true
+  },
+  "providers": {
+    "analytics": { "provider": "firebase" }
+  }
+}

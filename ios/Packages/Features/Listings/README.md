@@ -1,0 +1,26 @@
+# Features/Listings
+
+The golden-path proof ⭐: create-listing, browse, detail, and "my listings" — all schema-driven via `DynamicForms`, none of it vertical-specific. See [docs/planning/02-ios-architecture.md §6](../../../../docs/planning/02-ios-architecture.md#6-dynamic-form-rendering-the-ios-side-of-the-flagship) and [ROADMAP.md](../../../../docs/ROADMAP.md#phase-4--ios-golden-path-dynamicforms--listings-).
+
+**Status:** implemented and tested (`swift test` — 18/18 passing; `xcodebuild build -scheme Listings` confirmed). Depends on Core, DomainKit, DesignSystem, DynamicForms. Never imports `Features/Search`.
+
+- **`CategoryPickerView`/`CategoryPickerViewModel`** — a sheet-presented, self-contained 2-level drill-down (own `NavigationStack`) from the category tree root down to a leaf.
+- **`CreateListingView`/`CreateListingViewModel`** — the golden-path proof view: fetches the selected category's `ComposedSchema`, builds a `DynamicFormState`, and renders `DynamicFormView(state:)` — the exact same view renders a Cars form, an Apartments form, or a Phones form, driven entirely by what the schema fetch returns. `submit(defaultCurrency:)` client-validates via `formState.validate()`, then calls `listingUseCase.createListing`; a `DomainError.validation` (422) maps field errors back onto the form via `applyServerErrors`. `refreshSchema()` re-runs the same fetch for the currently selected category — the mechanism behind "edit a schema server-side → the app reflects it after a refresh, no rebuild" (unit-tested directly, and verified live via `ios/App/UITests/SchemaLiveEditUITests.swift`).
+- **`ListingFeedView`/`ListingFeedViewModel`** — cursor-paginated browse (Home tab).
+- **`ListingDetailView`/`ListingDetailViewModel`** — a schema-projected `attributeRows` computed property (maps `attributesIndex` keys back to their `SchemaField` labels for display).
+- **`MyListingsView`/`MyListingsViewModel`** — "my listings" with owner-appropriate transition actions (`OwnerAction` mirrors the dashboard's `OWNER_ACTIONS` and the backend's `ALLOWED_TRANSITIONS` state machine exactly: draft→submit for review, pending_review→withdraw, published→archive/mark sold, rejected/archived→relist) plus, for a moderator/admin identity, an approve/reject moderation queue. `MyListingsViewModel` resolves its own `isModerator` fresh on every `load()` via an injected `AuthUseCase` — see the "Real bug" note below for why that matters.
+- **`Shared/ListingRowView`** — the feed/my-listings row.
+
+## Cross-module DI
+
+Every ViewModel takes its use case(s) via a constructor default resolving through `DomainKit`'s registration points, e.g. `init(catalogUseCase: CatalogUseCase = Container.shared.catalogUseCase(), listingUseCase: ListingUseCase = Container.shared.listingUseCase())` — never a bare `@Injected` property wrapper, so tests inject fakes directly with zero global-container mutation (no races across concurrent Swift Testing runs). See `ios/Packages/DomainKit/README.md` for how the registration point itself is declared and overridden.
+
+## A real bug this package's UI test caught (and fixed here)
+
+`MyListingsView`'s per-row `.accessibilityIdentifier("my-listing-row.<id>")` was attached directly to a `VStack` containing both the row's own tap target and every owner/moderator action button. SwiftUI collapses a container into a single opaque accessibility element the moment any accessibility modifier lands on it, unless the container also declares `.accessibilityElement(children: .contain)` — so the action buttons were unreachable to VoiceOver (and to `XCUITest`) even though they rendered correctly on screen. Fixed by adding `.accessibilityElement(children: .contain)`.
+
+Separately, `isModerator` used to be computed asynchronously in `SellTabView` (`App`) and passed into `MyListingsView(isModerator:)`, which forwarded it into `MyListingsViewModel`'s `let isModerator: Bool` via `State(initialValue:)`. Since a `@State`'s initial value is captured once at first render, and the session lookup that determines the real value is async, the child's state permanently locked in `false` — a moderator could never see the moderation queue, regardless of how they signed in. Fixed by moving the resolution into `MyListingsViewModel.load()` itself (an injected `AuthUseCase`, re-checked on every load), removing the parameter and the race entirely. See [CHANGELOG.md](../../../../CHANGELOG.md) for the full write-up.
+
+## Verification
+
+`ios/App/UITests/GoldenPathUITests.swift` drives the real Simulator app against the real local backend gateway: creates a Car, an Apartment, and a Phone through this package's `CreateListingView`, walks the Car listing through submit-for-review → moderator-approve, and confirms it appears in "My listings" and (via `Features/Search`) in a filtered public search. `SchemaLiveEditUITests.swift` verifies the live-schema-refresh path. Run via `xcodebuild -workspace ios/MarketplacePlatform.xcworkspace -scheme MarketplacePlatform -destination 'platform=iOS Simulator,name=iPhone 17' test` (the local backend gateway must be running — `deno run --allow-net --allow-env --allow-read backend/scripts/serve-local.ts`).

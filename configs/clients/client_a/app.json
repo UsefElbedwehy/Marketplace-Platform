@@ -1,0 +1,22 @@
+{
+  "schemaFormatVersion": "1.0.0",
+  "clientId": "client_a",
+  "displayName": {
+    "en": "Client A Marketplace",
+    "ar": "سوق العميل أ"
+  },
+  "bundleIdentifier": "com.marketplaceplatform.clienta",
+  "urlScheme": "mktplace-clienta",
+  "associatedDomains": [],
+  "entitlements": {
+    "pushNotifications": true,
+    "signInWithApple": true,
+    "associatedDomainsEnabled": false
+  },
+  "signing": {},
+  "assets": {
+    "appIcon": "assets/app-icon.png",
+    "launchLogo": "assets/launch-logo.png",
+    "splashBackground": "assets/splash-background.png"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schemaFormatVersion": "1.0.0",
+  "clientId": "default",
+  "displayName": {
+    "en": "Marketplace",
+    "ar": "السوق"
+  },
+  "bundleIdentifier": "com.marketplaceplatform.default",
+  "urlScheme": "mktplace-default",
+  "associatedDomains": [],
+  "entitlements": {
+    "pushNotifications": true,
+    "signInWithApple": true,
+    "associatedDomainsEnabled": false
+  },
+  "signing": {},
+  "assets": {
+    "appIcon": "assets/app-icon.png",
+    "launchLogo": "assets/launch-logo.png",
+    "splashBackground": "assets/splash-background.png"
+  }
+}

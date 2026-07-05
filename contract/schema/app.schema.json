@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marketplace-platform.dev/schema/app.schema.json",
+  "title": "Development Schema — build-time slice (app.json)",
+  "description": "Identity, branding, signing, and entitlement knobs that are baked into an iOS/Android binary at build time and therefore cannot change at runtime. Drives the white-label build pipeline (see docs/planning/07-configuration-whitelabel-theme.md). One file per client under configs/clients/<client>/app.json.",
+  "type": "object",
+  "required": [
+    "schemaFormatVersion",
+    "clientId",
+    "displayName",
+    "bundleIdentifier",
+    "urlScheme",
+    "entitlements",
+    "assets"
+  ],
+  "properties": {
+    "schemaFormatVersion": {
+      "$ref": "common.schema.json#/$defs/semver",
+      "description": "Version of the Development Schema format this document targets. Bumped when the format changes; migrations ship with upgraders."
+    },
+    "clientId": {
+      "$ref": "common.schema.json#/$defs/slug",
+      "description": "Stable identifier matching the configs/clients/<clientId> directory name."
+    },
+    "displayName": {
+      "$ref": "common.schema.json#/$defs/localizedString",
+      "description": "App name as shown on the home screen / App Store, per locale."
+    },
+    "bundleIdentifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9]*)+$",
+      "description": "Reverse-DNS bundle identifier, e.g. com.acme.marketplace"
+    },
+    "urlScheme": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9+.-]*$",
+      "description": "Custom URL scheme for deep links, e.g. acme-marketplace"
+    },
+    "associatedDomains": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Universal Link domains, e.g. applinks:acme.example.com"
+    },
+    "entitlements": {
+      "type": "object",
+      "required": ["pushNotifications", "signInWithApple"],
+      "properties": {
+        "pushNotifications": { "type": "boolean" },
+        "signInWithApple": { "type": "boolean" },
+        "associatedDomainsEnabled": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "signing": {
+      "type": "object",
+      "description": "References to signing identity — never secrets. Actual credentials are managed by Fastlane Match / CI secrets, not this file.",
+      "properties": {
+        "teamId": { "type": "string" },
+        "provisioningProfileName": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "assets": {
+      "type": "object",
+      "required": ["appIcon", "launchLogo"],
+      "properties": {
+        "appIcon": { "$ref": "common.schema.json#/$defs/assetPath" },
+        "launchLogo": { "$ref": "common.schema.json#/$defs/assetPath" },
+        "splashBackground": { "$ref": "common.schema.json#/$defs/assetPath" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

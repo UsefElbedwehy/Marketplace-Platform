@@ -1,0 +1,33 @@
+{
+  "schemaFormatVersion": "1.0.0",
+  "clientId": "client_a",
+  "identity": {
+    "legalName": "Client A Trading Co.",
+    "shortName": { "en": "Client A", "ar": "العميل أ" }
+  },
+  "locales": {
+    "supported": ["ar", "en"],
+    "default": "ar",
+    "rtlLocales": ["ar"]
+  },
+  "currencies": {
+    "supported": ["KWD", "USD"],
+    "default": "KWD"
+  },
+  "countries": {
+    "supported": ["KW"],
+    "default": "KW"
+  },
+  "modules": {
+    "sellerDashboard": false,
+    "reviews": false
+  },
+  "support": {
+    "email": "support@client-a.example",
+    "chatEnabled": false
+  },
+  "legal": {
+    "termsUrl": "https://client-a.example/terms",
+    "privacyUrl": "https://client-a.example/privacy"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "data": {
+    "schemaFormatVersion": "1.0.0",
+    "clientId": "default",
+    "configVersion": 1,
+    "identity": {
+      "legalName": "Marketplace Platform Reference Co.",
+      "shortName": { "en": "Marketplace", "ar": "السوق" }
+    },
+    "locales": { "supported": ["en", "ar"], "default": "en", "rtlLocales": ["ar"] },
+    "currencies": { "supported": ["SAR", "KWD", "USD"], "default": "SAR" },
+    "countries": { "supported": ["SA", "KW", "AE"], "default": "SA" },
+    "modules": {
+      "authentication": true, "listings": true, "search": true, "favorites": true,
+      "chat": true, "notifications": true, "sellerDashboard": true, "subscriptions": false,
+      "payments": false, "wallet": false, "advertisements": false, "reviews": true, "moderation": true
+    },
+    "featureFlags": { "dynamicFormsDebugPanel": false },
+    "providers": {
+      "authentication": { "methods": ["email_password", "phone_otp", "apple", "anonymous"] },
+      "payments": { "provider": "none", "methods": [] },
+      "maps": { "provider": "apple" },
+      "push": { "provider": "apns" },
+      "analytics": { "provider": "firebase" }
+    },
+    "social": {
+      "instagram": "https://instagram.com/marketplaceplatform",
+      "twitter": "https://twitter.com/marketplaceplatform",
+      "website": "https://marketplace-platform.dev"
+    },
+    "support": { "email": "support@marketplace-platform.dev", "phone": "+966500000000", "chatEnabled": true },
+    "legal": {
+      "termsUrl": "https://marketplace-platform.dev/legal/terms",
+      "privacyUrl": "https://marketplace-platform.dev/legal/privacy"
+    }
+  }
+}

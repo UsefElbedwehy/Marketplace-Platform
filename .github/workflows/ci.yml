@@ -1,0 +1,85 @@
+name: CI
+
+# Phase 0: contract/config validation, generated-types drift/typecheck, and the
+# executable architecture-boundary lints (ADR-0014). As iOS/backend/dashboard
+# code lands in later phases, add path-scoped jobs alongside these — see
+# docs/planning/09-cross-cutting.md#cicd-strategy for the target shape
+# ("each PR runs only the jobs for changed areas").
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-config:
+    name: Validate configs/** against contract/schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run validate:config
+
+  contract-types:
+    name: Contract types — generate, typecheck, drift-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Regenerate contract types from contract/schema + contract/openapi
+        run: npm run generate:types
+      - name: Typecheck generated types
+        run: npm run typecheck:contract-types
+      - name: Fail if generated types are stale
+        run: |
+          if ! git diff --exit-code -- packages/contract-types/generated; then
+            echo "::error::packages/contract-types/generated is out of date. Run 'npm run generate:types' and commit the result."
+            exit 1
+          fi
+
+  boundaries:
+    name: Architecture boundary lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tooling/lint/boundaries.sh
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  ios-unit-tests:
+    name: iOS packages — swift test (Core/DomainKit/Networking/Configuration/DataKit)
+    # Runs the pure-Swift-Testing suites (no Simulator boot needed). DesignSystem's
+    # snapshot tests and the App target's Simulator UI tests
+    # (ios/App/UITests) require a real iOS Simulator + a running local
+    # backend gateway — not yet wired into CI, see ios/App/README.md for how
+    # to run them locally.
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        package: [Core, DomainKit, Networking, Configuration, DataKit]
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+        working-directory: ios/Packages/${{ matrix.package }}

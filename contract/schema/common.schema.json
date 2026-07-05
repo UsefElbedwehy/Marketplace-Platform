@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marketplace-platform.dev/schema/common.schema.json",
+  "title": "Common definitions",
+  "description": "Shared type definitions referenced by the Development Schema (app/config/theme) and by the API contract.",
+  "$defs": {
+    "localizedString": {
+      "type": "object",
+      "description": "A map of BCP-47-ish locale code to translated string. Must include at least the platform default locale's entry at the point of use.",
+      "patternProperties": {
+        "^[a-z]{2}(-[A-Z]{2})?$": { "type": "string", "minLength": 1 }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
+    },
+    "localeCode": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+      "examples": ["en", "ar", "ar-SA", "en-GB"]
+    },
+    "currencyCode": {
+      "type": "string",
+      "description": "ISO 4217 currency code.",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["SAR", "KWD", "USD", "AED"]
+    },
+    "countryCode": {
+      "type": "string",
+      "description": "ISO 3166-1 alpha-2 country code.",
+      "pattern": "^[A-Z]{2}$",
+      "examples": ["SA", "KW", "AE"]
+    },
+    "colorHex": {
+      "type": "string",
+      "pattern": "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+      "examples": ["#FF7A00", "#1A1A1AFF"]
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "slug": {
+      "type": "string",
+      "description": "Identifier matching a configs/clients/<slug> directory name. Accepts kebab-case or snake_case (the project foundation uses client_a/client_b/client_c).",
+      "pattern": "^[a-z0-9]+([_-][a-z0-9]+)*$"
+    },
+    "assetPath": {
+      "type": "string",
+      "description": "Relative path (from the owning client's config directory) to an asset file.",
+      "pattern": "^assets/.+"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "marketplace-platform",
+  "private": true,
+  "version": "0.0.0",
+  "description": "White-Label Marketplace Platform monorepo",
+  "workspaces": [
+    "packages/*",
+    "dashboard"
+  ],
+  "scripts": {
+    "validate:config": "npm run validate --workspace=packages/config-validation",
+    "generate:types": "npm run generate --workspace=packages/contract-types",
+    "typecheck:contract-types": "tsc -p packages/contract-types/tsconfig.json",
+    "lint:boundaries": "bash tooling/lint/boundaries.sh",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

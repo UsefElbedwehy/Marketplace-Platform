@@ -1,0 +1,19 @@
+{
+  "clientId": "client_a",
+  "themeVersion": 1,
+  "colors": {
+    "light": {
+      "primary": "#16A34A",
+      "secondary": "#065F46",
+      "accent": "#F59E0B",
+      "selection": "#DCFCE7",
+      "favorite": "#DC2626"
+    },
+    "dark": {
+      "primary": "#22C55E",
+      "secondary": "#4ADE80",
+      "selection": "#14532D",
+      "favorite": "#F87171"
+    }
+  }
+}

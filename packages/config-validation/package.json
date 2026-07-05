@@ -1,0 +1,18 @@
+{
+  "name": "@marketplace-platform/config-validation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Validates configs/** (Development Schema documents) against contract/schema/*.schema.json in CI and locally.",
+  "bin": {
+    "config-validate": "./src/cli.js"
+  },
+  "scripts": {
+    "validate": "node src/cli.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

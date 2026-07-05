@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "postgres": "jsr:@db/postgres@^0.19.5",
+    "djwt": "jsr:@zaubrik/djwt@^3.0.2"
+  },
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env --allow-read scripts/serve-local.ts",
+    "test": "deno test --allow-net --allow-env --allow-read src/ supabase/functions/"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@marketplace-platform/contract-types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates TypeScript types from contract/schema (JSON Schema) and contract/openapi (OpenAPI) for the dashboard and backend Deno/TS runtime.",
+  "main": "./generated/index.js",
+  "types": "./generated/index.d.ts",
+  "scripts": {
+    "generate": "node src/generate.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "json-schema-to-typescript": "^15.0.4",
+    "openapi-typescript": "^7.13.0"
+  }
+}

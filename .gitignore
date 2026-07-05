@@ -1,0 +1,42 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+*.tsbuildinfo
+
+# macOS
+.DS_Store
+
+# iOS / Xcode (populated from Phase 3 onward)
+ios/**/.build/
+ios/**/DerivedData/
+ios/**/*.xcuserstate
+ios/**/xcuserdata/
+ios/**/.swiftpm/
+# Tuist-generated (ios/Project.swift + ios/Tuist/Package.swift are the source
+# of truth — `tuist install && tuist generate` reproduces these)
+ios/*.xcodeproj/
+ios/*.xcworkspace/
+ios/Derived/
+ios/.tuist-*
+# `xcodebuild test -scheme <Package>` against a plain SPM package directory
+# (e.g. running DesignSystem's/DynamicForms' snapshot tests) materializes a
+# throwaway <Package>.xcodeproj as a side effect — Package.swift remains the
+# source of truth, this is regenerated on demand and never hand-edited.
+ios/Packages/**/*.xcodeproj/
+
+# Next.js (populated from Phase 5 onward)
+dashboard/.next/
+dashboard/out/
+
+# Supabase local runtime state
+backend/supabase/.branches/
+backend/supabase/.temp/
+
+# Editor
+.vscode/
+.idea/
+
+# Env / secrets — never commit real credentials
+.env
+.env.*
+!.env.example

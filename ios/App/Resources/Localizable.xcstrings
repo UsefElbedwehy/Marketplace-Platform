@@ -1,0 +1,146 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Marketplace Platform" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "منصة السوق"
+          }
+        }
+      }
+    },
+    "Choose a dev identity to sign in as" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر هوية تجريبية لتسجيل الدخول بها"
+          }
+        }
+      }
+    },
+    "DEV LOGIN" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دخول تجريبي"
+          }
+        }
+      }
+    },
+    "Home" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الرئيسية"
+          }
+        }
+      }
+    },
+    "Search" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بحث"
+          }
+        }
+      }
+    },
+    "Sell" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بيع"
+          }
+        }
+      }
+    },
+    "Chat" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "محادثة"
+          }
+        }
+      }
+    },
+    "Profile" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الملف الشخصي"
+          }
+        }
+      }
+    },
+    "The feed lands in Phase 6 — this proves the themed tab shell today." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيتم إضافة الواجهة الرئيسية في المرحلة السادسة — هذا يثبت هيكل التبويبات المتوافق مع الهوية البصرية اليوم."
+          }
+        }
+      }
+    },
+    "Dynamic filters from category attributes land in Phase 4." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفلاتر الديناميكية من خصائص الفئات ستُضاف في المرحلة الرابعة."
+          }
+        }
+      }
+    },
+    "The schema-driven create-listing flow lands in Phase 4." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نموذج إنشاء الإعلان المعتمد على المخطط سيُضاف في المرحلة الرابعة."
+          }
+        }
+      }
+    },
+    "Buyer/seller chat lands in Phase 6." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "محادثة المشتري والبائع ستُضاف في المرحلة السادسة."
+          }
+        }
+      }
+    },
+    "Sign out" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الخروج"
+          }
+        }
+      }
+    },
+    "Signing out…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تسجيل الخروج…"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

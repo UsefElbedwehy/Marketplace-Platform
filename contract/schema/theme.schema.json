@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marketplace-platform.dev/schema/theme.schema.json",
+  "title": "Theme Engine tokens (theme.json)",
+  "description": "Semantic design tokens for the Theme Engine. Views reference these roles, never raw literals (enforced by CI lint on the DesignSystem module). Fetched at boot (GET /v1/theme) and editable live in the dashboard's Theme Studio. See docs/planning/07-configuration-whitelabel-theme.md §4 and ADR-0005.",
+  "type": "object",
+  "required": ["schemaFormatVersion", "clientId", "colors", "typography"],
+  "$defs": {
+    "semanticColorSet": {
+      "type": "object",
+      "description": "The full semantic color vocabulary mandated by the project foundation. All keys required so a theme is never partially defined for a given color scheme.",
+      "required": [
+        "primary", "secondary", "accent",
+        "background", "surface", "card", "border",
+        "textPrimary", "textSecondary", "placeholder",
+        "success", "warning", "danger", "info",
+        "separator", "overlay", "skeleton", "loading", "selection",
+        "navigation", "toolbar", "tabBar",
+        "glass", "material", "interactive",
+        "badge", "favorite", "online", "offline"
+      ],
+      "properties": {
+        "primary": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "secondary": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "accent": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "background": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "surface": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "card": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "border": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "textPrimary": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "textSecondary": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "placeholder": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "success": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "warning": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "danger": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "info": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "separator": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "overlay": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "skeleton": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "loading": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "selection": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "navigation": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "toolbar": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "tabBar": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "glass": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "material": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "interactive": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "badge": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "favorite": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "online": { "$ref": "common.schema.json#/$defs/colorHex" },
+        "offline": { "$ref": "common.schema.json#/$defs/colorHex" }
+      },
+      "additionalProperties": false
+    },
+    "textStyle": {
+      "type": "object",
+      "required": ["size", "weight"],
+      "properties": {
+        "size": { "type": "number", "exclusiveMinimum": 0 },
+        "weight": {
+          "type": "string",
+          "enum": ["regular", "medium", "semibold", "bold", "heavy"]
+        },
+        "lineHeight": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "schemaFormatVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "clientId": { "$ref": "common.schema.json#/$defs/slug" },
+    "themeVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped on every published theme change; drives client cache invalidation."
+    },
+    "colors": {
+      "type": "object",
+      "required": ["light", "dark"],
+      "properties": {
+        "light": { "$ref": "#/$defs/semanticColorSet" },
+        "dark": { "$ref": "#/$defs/semanticColorSet" }
+      },
+      "additionalProperties": false
+    },
+    "typography": {
+      "type": "object",
+      "required": ["fontFamily", "scale"],
+      "properties": {
+        "fontFamily": { "type": "string" },
+        "scale": {
+          "type": "object",
+          "required": ["largeTitle", "title1", "title2", "headline", "body", "subheadline", "caption", "footnote"],
+          "properties": {
+            "largeTitle": { "$ref": "#/$defs/textStyle" },
+            "title1": { "$ref": "#/$defs/textStyle" },
+            "title2": { "$ref": "#/$defs/textStyle" },
+            "headline": { "$ref": "#/$defs/textStyle" },
+            "body": { "$ref": "#/$defs/textStyle" },
+            "subheadline": { "$ref": "#/$defs/textStyle" },
+            "caption": { "$ref": "#/$defs/textStyle" },
+            "footnote": { "$ref": "#/$defs/textStyle" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "shape": {
+      "type": "object",
+      "properties": {
+        "cornerRadiusSmall": { "type": "number", "minimum": 0, "default": 4 },
+        "cornerRadiusMedium": { "type": "number", "minimum": 0, "default": 8 },
+        "cornerRadiusLarge": { "type": "number", "minimum": 0, "default": 16 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

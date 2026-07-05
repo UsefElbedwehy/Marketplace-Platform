@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marketplace-platform.dev/schema/config.schema.json",
+  "title": "Development Schema — runtime slice (config.json)",
+  "description": "Backend-driven configuration fetched by clients at boot (GET /v1/config). Dashboard-editable without a rebuild: locales, currencies, countries, feature flags/modules, provider selection, links, legal, support. See docs/planning/07-configuration-whitelabel-theme.md and ADR-0004. This is deep-merged: configs/clients/default/config.json <- configs/clients/<client>/config.json <- configs/<env>/config.json.",
+  "type": "object",
+  "required": [
+    "schemaFormatVersion",
+    "clientId",
+    "locales",
+    "currencies",
+    "countries",
+    "modules",
+    "featureFlags",
+    "providers",
+    "support",
+    "legal"
+  ],
+  "properties": {
+    "schemaFormatVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "clientId": { "$ref": "common.schema.json#/$defs/slug" },
+    "configVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped by the backend on every published change; drives client ETag/cache invalidation. Absent in static seed files (assigned when the backend stores the config)."
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "legalName": { "type": "string" },
+        "shortName": { "$ref": "common.schema.json#/$defs/localizedString" }
+      },
+      "additionalProperties": false
+    },
+    "locales": {
+      "type": "object",
+      "required": ["supported", "default"],
+      "properties": {
+        "supported": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/localeCode" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "default": { "$ref": "common.schema.json#/$defs/localeCode" },
+        "rtlLocales": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/localeCode" },
+          "default": ["ar"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "currencies": {
+      "type": "object",
+      "required": ["supported", "default"],
+      "properties": {
+        "supported": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/currencyCode" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "default": { "$ref": "common.schema.json#/$defs/currencyCode" }
+      },
+      "additionalProperties": false
+    },
+    "countries": {
+      "type": "object",
+      "required": ["supported", "default"],
+      "properties": {
+        "supported": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/countryCode" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "default": { "$ref": "common.schema.json#/$defs/countryCode" }
+      },
+      "additionalProperties": false
+    },
+    "modules": {
+      "type": "object",
+      "description": "Capability flags — which platform modules are mounted for this client (tabs/coordinators/endpoints exposed). See docs/planning/07 §5 and ADR-0008. A closed set: a new module means new code (a coordinator/tab/endpoint group), so adding one is a schema change, not just a config change — contrast with the open-ended featureFlags below.",
+      "properties": {
+        "authentication": { "type": "boolean", "default": true },
+        "listings": { "type": "boolean", "default": true },
+        "search": { "type": "boolean", "default": true },
+        "favorites": { "type": "boolean", "default": true },
+        "chat": { "type": "boolean", "default": true },
+        "notifications": { "type": "boolean", "default": true },
+        "sellerDashboard": { "type": "boolean", "default": false },
+        "subscriptions": { "type": "boolean", "default": false },
+        "payments": { "type": "boolean", "default": false },
+        "wallet": { "type": "boolean", "default": false },
+        "advertisements": { "type": "boolean", "default": false },
+        "reviews": { "type": "boolean", "default": false },
+        "moderation": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    },
+    "featureFlags": {
+      "type": "object",
+      "description": "Operational flags — kill-switches / gradual rollout for already-shipped features. Distinct from `modules` (capability composition). Keys are typed on each client via a generated enum.",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "providers": {
+      "type": "object",
+      "required": ["authentication", "maps", "analytics"],
+      "properties": {
+        "authentication": {
+          "type": "object",
+          "required": ["methods"],
+          "properties": {
+            "methods": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["email_password", "phone_otp", "apple", "google", "anonymous"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "payments": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["none", "stripe", "tap", "hyperpay", "myfatoorah"]
+            },
+            "methods": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "maps": {
+          "type": "object",
+          "required": ["provider"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["apple", "google", "mapbox"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "push": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "enum": ["apns", "fcm"] }
+          },
+          "additionalProperties": false
+        },
+        "analytics": {
+          "type": "object",
+          "required": ["provider"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["none", "firebase", "amplitude", "mixpanel"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "social": {
+      "type": "object",
+      "properties": {
+        "instagram": { "$ref": "common.schema.json#/$defs/url" },
+        "twitter": { "$ref": "common.schema.json#/$defs/url" },
+        "facebook": { "$ref": "common.schema.json#/$defs/url" },
+        "tiktok": { "$ref": "common.schema.json#/$defs/url" },
+        "whatsapp": { "$ref": "common.schema.json#/$defs/url" },
+        "website": { "$ref": "common.schema.json#/$defs/url" }
+      },
+      "additionalProperties": false
+    },
+    "support": {
+      "type": "object",
+      "required": ["email"],
+      "properties": {
+        "email": { "$ref": "common.schema.json#/$defs/email" },
+        "phone": { "type": "string" },
+        "chatEnabled": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "legal": {
+      "type": "object",
+      "required": ["termsUrl", "privacyUrl"],
+      "properties": {
+        "termsUrl": { "$ref": "common.schema.json#/$defs/url" },
+        "privacyUrl": { "$ref": "common.schema.json#/$defs/url" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

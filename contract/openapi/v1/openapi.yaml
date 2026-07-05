@@ -1,0 +1,1166 @@
+openapi: 3.1.0
+info:
+  title: Marketplace Platform API
+  version: "1.0.0"
+  description: |
+    Versioned REST contract for the White-Label Marketplace Platform. This is the
+    single source of truth clients (iOS, Android, Web, Dashboard) depend on — never
+    the Supabase SDK or PostgREST directly. See docs/planning/08-api-auth.md and
+    ADR-0002 / ADR-0006.
+
+    Status: config/theme (Phase 1) and catalog/listings (Phase 2 ⭐, the Dynamic
+    Category & Attribute Engine) are implemented and verified end-to-end against
+    real Postgres — see backend/supabase/functions/README.md. Auth (Phase 1's real
+    GoTrue-backed flows) is not yet implemented; only a local-dev token minter
+    (v1-dev-auth, deliberately absent from this spec) exists so RLS-guarded paths
+    can be exercised without Docker.
+  contact:
+    name: Platform Architecture
+servers:
+  - url: "https://{project}.supabase.co/functions/v1"
+    description: Supabase Edge Functions (BFF)
+    variables:
+      project:
+        default: local
+tags:
+  - name: system
+    description: Health and meta endpoints.
+  - name: config
+    description: Runtime Development Schema (branding, locales, features, providers).
+  - name: theme
+    description: Theme Engine semantic tokens.
+  - name: catalog
+    description: Dynamic Category & Attribute Engine — category tree, composed listing schemas, attribute options. ⭐
+  - name: listings
+    description: Create and filter marketplace listings.
+  - name: users
+    description: Admin user/role management.
+  - name: chat
+    description: Buyer↔seller chat on a listing ⭐ (Phase 6). Poll-based REST reads — see the description on GET /v1/chat/conversations/{conversationId}/messages for why.
+  - name: favorites
+    description: A buyer's saved listings (Phase 6).
+  - name: reviews
+    description: A buyer's rating of a seller (Phase 6).
+  - name: notifications
+    description: The in-app notification list an outbox-backed poll reads (Phase 6).
+  - name: profiles
+    description: A seller's public profile (Phase 6) — distinct from the admin-only `users` tag.
+
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /v1/config:
+    get:
+      operationId: getConfig
+      tags: [config]
+      summary: Fetch the runtime configuration bundle for the calling client
+      description: |
+        Returns the effective runtime slice of the Development Schema (locales,
+        currencies, countries, modules, feature flags, provider selection, social,
+        support, legal) for the tenant resolved from the auth context / client key.
+        Supports ETag / If-None-Match caching keyed on configVersion.
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: Current runtime config.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "../../schema/config.schema.json"
+        "304":
+          description: Not modified — cached config is current.
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/theme:
+    get:
+      operationId: getTheme
+      tags: [theme]
+      summary: Fetch the active theme token set for the calling client
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: Current theme tokens.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "../../schema/theme.schema.json"
+        "304":
+          description: Not modified — cached theme is current.
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/categories/tree:
+    get:
+      operationId: getCategoryTree
+      tags: [catalog]
+      summary: Fetch the full category tree
+      description: |
+        Returns every active category as a nested tree (unlimited depth in
+        principle; the default reference marketplace seeds two levels). See
+        docs/planning/05-dynamic-schema-engine.md §5.
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Locale"
+      responses:
+        "200":
+          description: The category tree.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CategoryTreeNode"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/categories/{categoryId}/schema:
+    get:
+      operationId: getCategorySchema
+      tags: [catalog]
+      summary: Fetch the composed dynamic listing schema for a leaf category ⭐
+      description: |
+        Composes catalog.category + attribute_group + attribute + attribute_option
+        + attribute_dependency into the one document DynamicForms (and the
+        dashboard's Schema Builder preview) render from — schema-driven, never
+        screen-driven. The same shape for every category, however structurally
+        different (Cars vs. Apartments vs. Phones).
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Locale"
+      responses:
+        "200":
+          description: The composed schema.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ComposedSchema"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/attributes/{attributeId}/options:
+    get:
+      operationId: getAttributeOptions
+      tags: [catalog]
+      summary: Fetch (optionally dependent) options for an attribute
+      description: |
+        Supports the "Model options_filtered_by Brand" pattern via `parent` —
+        pass the parent attribute's selected option id to get only its
+        dependent options. Paginated for large option sets (e.g. car models).
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - name: attributeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: parent
+          in: query
+          required: false
+          description: Parent option id — filters to options whose parent_option_id matches.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - $ref: "#/components/parameters/Locale"
+      responses:
+        "200":
+          description: Matching options.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AttributeOption"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/listings:
+    get:
+      operationId: listListings
+      tags: [listings]
+      summary: Filter/browse published listings
+      description: |
+        Filters compile against listing.attributes_index (docs/planning/05
+        §7). `filters` is a JSON-encoded object: equality (`{"brand":"bmw"}`)
+        or range (`{"mileage":{"lt":100000}}`) per key, where keys are
+        attribute `key`s from the category's composed schema.
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          description: Defaults to "published" unless `owner=me` is set. Moderators may request e.g. "pending_review" to see the moderation queue (RLS scopes what's actually returned).
+          schema: { type: string }
+        - name: owner
+          in: query
+          required: false
+          description: Pass "me" to see every status of your own listings ("my listings") instead of the published-only default.
+          schema: { type: string, enum: [me] }
+        - name: filters
+          in: query
+          required: false
+          description: JSON-encoded attribute filter object.
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Matching listings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Listing"
+                  page:
+                    $ref: "#/components/schemas/PaginationMeta"
+        default:
+          $ref: "#/components/responses/Error"
+
+    post:
+      operationId: createListing
+      tags: [listings]
+      summary: Create a listing ⭐
+      description: |
+        Attribute values are validated against the target category's schema
+        at the request level (field-level errors) before the authoritative
+        database trigger (listing.enforce_attribute_value_type) re-checks
+        them — see ADR-0003. Requires authentication; the created listing
+        starts as `draft`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateListingRequest"
+      responses:
+        "201":
+          description: Listing created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Listing"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/listings/{listingId}:
+    get:
+      operationId: getListing
+      tags: [listings]
+      summary: Fetch a single listing (schema-projected detail view) ⭐
+      description: |
+        RLS (owner, moderator, or anyone for a published listing) gates row
+        access — a listing you can't see resolves to 404, not 403, so
+        existence isn't leaked. Clients project `attributesIndex` against the
+        category's composed schema (`GET /v1/categories/{id}/schema`) for
+        labels/units, the same pattern `GET /v1/listings` uses.
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The listing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Listing"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+    patch:
+      operationId: updateListingStatus
+      tags: [listings]
+      summary: Transition a listing's status (submit for review, approve, reject, archive, mark sold) ⭐
+      description: |
+        RLS (owner or moderator) gates row access; this endpoint additionally
+        enforces which status-to-status transitions are legal at all, and
+        that only a moderator/admin can move a listing to `published` or
+        `rejected` — the dashboard's moderation queue writes through here.
+        See docs/planning/06-dashboard-architecture.md and the state machine
+        in backend/src/listing_service.ts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, pending_review, published, rejected, archived, sold]
+      responses:
+        "200":
+          description: Updated listing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Listing"
+        "403":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List tenant users (admin only)
+      description: |
+        RLS (profile_select_own_or_admin) already scopes reads to "your own
+        row, or every row if you're an admin/super_admin"; this endpoint
+        additionally 403s cleanly for non-admins instead of just returning
+        their own single row, since this is an admin-only screen.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tenant users.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserProfile"
+        "403":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/users/{userId}:
+    patch:
+      operationId: updateUserRole
+      tags: [users]
+      summary: Change another user's role (admin only, never your own) ⭐
+      description: |
+        RLS (profile_update_admin) gates row access; backend/src/user_service.ts
+        additionally forbids an actor changing their own role even if they are
+        an admin — see identity.prevent_self_role_escalation's header comment
+        (migration 20260704155058) for why this is enforced at both layers.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [appRole]
+              properties:
+                appRole:
+                  type: string
+                  enum: [buyer, seller, catalog_editor, moderator, finance, support, admin, super_admin]
+      responses:
+        "200":
+          description: Updated user.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+        "403":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/chat/conversations:
+    get:
+      operationId: listConversations
+      tags: [chat]
+      summary: List the caller's conversations
+      description: |
+        RLS (conversation_select_participant) scopes this to conversations the
+        caller participates in as buyer or seller — no explicit filter is
+        needed server-side. 404s if the `chat` module is disabled for this
+        client.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's conversations, most recently active first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Conversation"
+        default:
+          $ref: "#/components/responses/Error"
+
+    post:
+      operationId: startConversation
+      tags: [chat]
+      summary: Start (or resume) a conversation with a listing's seller ⭐
+      description: |
+        Buyer-initiated only — a seller cannot proactively start a thread
+        with a buyer through this endpoint. Re-opening chat about a listing
+        you've already messaged the seller about resumes that same
+        conversation (unique on listing + buyer). Rejects starting a
+        conversation about your own listing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listingId]
+              properties:
+                listingId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: The conversation (created, or the pre-existing one for this listing+buyer pair).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Conversation"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/chat/conversations/{conversationId}/messages:
+    get:
+      operationId: listMessages
+      tags: [chat]
+      summary: Fetch a conversation's messages (poll-based, no Realtime)
+      description: |
+        docs/planning/03-backend-architecture.md §6 specifies chat as
+        Realtime-delivered; real Supabase Realtime needs the hosted/Docker
+        Realtime service, unavailable in this environment (the same gap as
+        real GoTrue-backed auth) — so clients poll this endpoint instead.
+        Fetching also marks every message from the other participant as
+        read. RLS (message_select_participant) is the actual access gate.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Messages, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Message"
+        default:
+          $ref: "#/components/responses/Error"
+
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send a message ⭐
+      description: |
+        RLS (message_insert_participant) gates this to participants of the
+        conversation. Creates a `chat_message` notification for the other
+        participant as part of the same request (backend/src/notifications_
+        service.ts) — see the `notifications` tag for how that's delivered.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 4000 }
+      responses:
+        "201":
+          description: Message sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Message"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/favorites:
+    get:
+      operationId: listFavorites
+      tags: [favorites]
+      summary: List the caller's saved listings
+      description: RLS (favorite_all_own) scopes this to the caller's own favorites.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's favorites, most recently saved first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Favorite"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/favorites/{listingId}:
+    put:
+      operationId: addFavorite
+      tags: [favorites]
+      summary: Save a listing (idempotent)
+      description: Calling this twice for the same listing is a no-op returning the same favorite — not an error.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The favorite (created, or already existing).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Favorite"
+        default:
+          $ref: "#/components/responses/Error"
+
+    delete:
+      operationId: removeFavorite
+      tags: [favorites]
+      summary: Unsave a listing (idempotent)
+      description: Removing a listing that isn't favorited (or isn't yours) is a harmless no-op.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed (or was never favorited).
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/reviews:
+    get:
+      operationId: listReviews
+      tags: [reviews]
+      summary: Fetch a seller's reviews
+      description: RLS (review_select_public) makes reviews public read — anyone, including anon.
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - name: sellerId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The seller's reviews, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Review"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Rate a seller ⭐
+      description: |
+        Immutable once posted (no update/delete policy on social.review).
+        Aggregated onto the seller's public profile (rating_count/rating_sum)
+        by a database trigger, not client math — see GET /v1/profiles/{id}.
+        Rejects reviewing yourself and duplicate reviews for the same
+        (reviewer, reviewee, listing) triple.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+      responses:
+        "201":
+          description: Review created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Review"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List the caller's notifications (poll-based, no Realtime)
+      description: |
+        docs/planning/03-backend-architecture.md §6 specifies an outbox table
+        + Realtime channel per user with push (APNs) fan-out via a provider
+        port; real APNs credentials aren't available in this environment
+        (backend/src/ports/push_port.ts), so `deliveredAt` reflects a logging
+        no-op adapter, not a real device delivery. RLS (outbox_select_own)
+        scopes this to the caller's own notifications.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's notifications, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/notifications/{notificationId}:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Updated notification.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Notification"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/profiles/{userId}:
+    get:
+      operationId: getPublicSellerProfile
+      tags: [profiles]
+      summary: View a seller's public profile ⭐
+      description: |
+        Distinct from GET /v1/users/{id} (admin-only, full profile) — this is
+        a public, read-only lookup exposing only display name, avatar, bio,
+        member-since, rating aggregate, and published listing count.
+      security:
+        - bearerAuth: []
+        - anonymousAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The seller's public profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PublicSellerProfile"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    anonymousAuth:
+      type: apiKey
+      in: header
+      name: X-Anonymous-Session
+      description: Guest/anonymous session token issued by POST /v1/auth/anonymous (Phase 1).
+
+  parameters:
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema: { type: string }
+    Locale:
+      name: locale
+      in: query
+      required: false
+      description: Resolves i18n label maps server-side (docs/planning/05 §5). Defaults to "en".
+      schema: { type: string, default: en }
+
+  responses:
+    Error:
+      description: Standard error envelope.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code driving client behavior.
+              examples: [validation_failed, unauthorized, not_found, rate_limited]
+            message:
+              type: string
+              description: Localized, human-readable summary. Display-only.
+            requestId:
+              type: string
+            fields:
+              type: array
+              description: Present for validation errors; maps directly onto dynamic form fields.
+              items:
+                type: object
+                required: [field, code, message]
+                properties:
+                  field: { type: string }
+                  code: { type: string }
+                  message: { type: string }
+
+    PaginationMeta:
+      type: object
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+        hasMore:
+          type: boolean
+
+    CategoryTreeNode:
+      type: object
+      required: [id, slug, name, sortOrder, isLeaf, children]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string, description: "Locale-resolved (see the locale query parameter)." }
+        icon: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        isLeaf: { type: boolean }
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryTreeNode"
+
+    AttributeOption:
+      type: object
+      required: [id, value, label, parentOptionId]
+      properties:
+        id: { type: string, format: uuid }
+        value: { type: string }
+        label: { type: string }
+        parentOptionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: For dependent option sets (e.g. Model options filtered by Brand) — the parent option this one belongs to.
+
+    AttributeDependency:
+      type: object
+      required: [field, rule, condition]
+      properties:
+        field: { type: string, description: "The key of the attribute this one depends on." }
+        rule: { type: string, enum: [visible_when, required_when, options_filtered_by] }
+        condition: { type: object }
+
+    SchemaField:
+      type: object
+      required: [id, key, label, dataType, inputType, required, filterable, searchable, sortOrder, validation, options, dependsOn]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The underlying attribute id — present so admin clients (the dashboard) can target POST /v1/attributes/{id}/options and /dependencies; read-only app clients can ignore it.
+        key: { type: string }
+        label: { type: string }
+        dataType: { type: string, enum: [text, number, bool, date, option, option_multi, media, location] }
+        inputType: { type: string, enum: [textfield, textarea, stepper, slider, dropdown, chips, switch, datepicker, media, map] }
+        required: { type: boolean }
+        filterable: { type: boolean }
+        searchable: { type: boolean }
+        sortOrder: { type: integer }
+        unit: { type: string, nullable: true }
+        validation: { type: object }
+        defaultValue: {}
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttributeOption"
+        dependsOn:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttributeDependency"
+
+    SchemaGroup:
+      type: object
+      required: [id, name, collapsible, fields]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        collapsible: { type: boolean }
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchemaField"
+
+    ComposedSchema:
+      type: object
+      required: [schemaVersion, category, groups]
+      properties:
+        schemaVersion:
+          type: integer
+          description: Bumped on any change to this category's groups/attributes/options/dependencies — ETag this for cache invalidation.
+        category:
+          type: object
+          required: [id, slug, name, path]
+          properties:
+            id: { type: string, format: uuid }
+            slug: { type: string }
+            name: { type: string }
+            path:
+              type: array
+              items: { type: string }
+              description: Root-to-leaf breadcrumb, e.g. ["Vehicles", "Cars"].
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchemaGroup"
+
+    Listing:
+      type: object
+      required: [id, ownerId, categoryId, title, status, attributesIndex, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        ownerId:
+          type: string
+          format: uuid
+          description: The seller — added in Phase 6 to link a listing to its "message seller" / seller-profile affordances (GET /v1/chat/conversations, GET /v1/profiles/{id}).
+        categoryId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        price: { type: number, nullable: true }
+        currency: { type: string, nullable: true }
+        status: { type: string, enum: [draft, pending_review, published, rejected, archived, sold] }
+        attributesIndex:
+          type: object
+          description: "The listing's attribute values, keyed by attribute key (see listing.attributes_index, ADR-0003)."
+        createdAt: { type: string, format: date-time }
+
+    CreateListingRequest:
+      type: object
+      required: [categoryId, title, attributes]
+      properties:
+        categoryId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        price: { type: number }
+        currency: { type: string }
+        attributes:
+          type: object
+          description: Raw submitted values keyed by attribute key, validated against the category's composed schema server-side.
+
+    UserProfile:
+      type: object
+      required: [id, email, displayName, appRole, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, nullable: true }
+        displayName: { type: string, nullable: true }
+        appRole:
+          type: string
+          enum: [buyer, seller, catalog_editor, moderator, finance, support, admin, super_admin]
+        createdAt: { type: string, format: date-time }
+
+    Conversation:
+      type: object
+      required: [id, listingId, listingTitle, buyerId, buyerDisplayName, sellerId, sellerDisplayName, lastMessageAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        listingId: { type: string, format: uuid }
+        listingTitle: { type: string }
+        buyerId: { type: string, format: uuid }
+        buyerDisplayName: { type: string, nullable: true }
+        sellerId: { type: string, format: uuid }
+        sellerDisplayName: { type: string, nullable: true }
+        lastMessageAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Message:
+      type: object
+      required: [id, conversationId, senderId, body, readAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        conversationId: { type: string, format: uuid }
+        senderId: { type: string, format: uuid }
+        body: { type: string }
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Favorite:
+      type: object
+      required: [id, listingId, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        listingId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    Review:
+      type: object
+      required: [id, reviewerId, reviewerDisplayName, revieweeId, listingId, rating, comment, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        reviewerId: { type: string, format: uuid }
+        reviewerDisplayName: { type: string, nullable: true }
+        revieweeId: { type: string, format: uuid }
+        listingId: { type: string, format: uuid, nullable: true }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreateReviewRequest:
+      type: object
+      required: [revieweeId, rating]
+      properties:
+        revieweeId: { type: string, format: uuid }
+        listingId: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string }
+
+    Notification:
+      type: object
+      required: [id, type, payload, readAt, deliveredAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [chat_message, listing_favorited, review_received] }
+        payload:
+          type: object
+          description: Shape depends on `type` — e.g. a chat_message notification's payload has conversationId/messageId/listingId.
+        readAt: { type: string, format: date-time, nullable: true }
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the push provider port attempted delivery — not a guarantee of real device delivery (backend/src/ports/push_port.ts).
+        createdAt: { type: string, format: date-time }
+
+    PublicSellerProfile:
+      type: object
+      required: [id, displayName, avatarUrl, bio, memberSince, ratingCount, ratingAverage, publishedListingCount]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+        bio: { type: string, nullable: true }
+        memberSince: { type: string, format: date-time }
+        ratingCount: { type: integer }
+        ratingAverage: { type: number, nullable: true, description: "rating_sum / rating_count, rounded to 1 decimal; null if ratingCount is 0." }
+        publishedListingCount: { type: integer }

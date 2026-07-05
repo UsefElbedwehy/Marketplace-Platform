@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "Mileage must be no more than 2,000,000 km.",
+    "requestId": "req_01hx9example",
+    "fields": [
+      { "field": "mileage", "code": "max", "message": "Must be ≤ 2,000,000" }
+    ]
+  }
+}
